@@ -18,24 +18,22 @@ end
 def parse_opts
   return {
     :running_only => false,
-    :filter => /.*/,
-    # :filter => /centos6/,
+    # :filter => /.*/,
+    :filter => /centos6/,
     :do_name => true,
     :do_vagrantfile_dir => true,
     :do_status => true,
     :do_user => true,
+    :do_cpus => true,
+    :do_memory => true,
     :do_pid => true,  # depends on status, name and user
     :do_ps_stats => true, # depends on status and pid
 
     # sum of harddisks
     # OS
     # guest additions version
-    # memory
-    # cpus
     # port offset
     # last legit login
-    # cpu time
-    # used memory
     # presence of sandman file
     # info from Vagrantfile
     #   git up to date?
@@ -63,7 +61,7 @@ def get_vm_details(opts, vbm, vm_name)
     vmi[match[:key]] = match[:val] if match
   end
 
-  #pp vmi
+  pp vmi
   
   return nil unless looks_like_vagrant(vmi)
 
@@ -125,6 +123,14 @@ def do_ps_stats(v,d)
       d[:used_cpu_sec] = m[:seconds].to_i + m[:minutes].to_i*60 + m[:hours].to_i*3600 + (m[:days] || 0).to_i*3600*24
     end
   end
+end
+
+def do_memory(v,d)
+  d[:assigned_memory_mb] = v['memory']
+end
+
+def do_cpus(v,d)
+  d[:assigned_cpus] = v['cpus']
 end
 
 
