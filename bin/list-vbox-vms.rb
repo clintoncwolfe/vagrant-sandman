@@ -24,6 +24,8 @@ def parse_opts
     :do_vagrantfile_dir => true,
     :do_status => true,
     :do_user => true,
+    :do_pid => true,  # depends on status, name and user
+    :do_ps_stats => true, # depends on status and pid
 
     # sum of harddisks
     # OS
@@ -32,9 +34,8 @@ def parse_opts
     # cpus
     # port offset
     # last legit login
-    # PID
     # cpu time
-    # user 
+    # used memory
     # presence of sandman file
     # info from Vagrantfile
     #   git up to date?
@@ -100,6 +101,30 @@ end
 
 def do_user(v,d)
   d[:username] = Etc.getpwuid(Process.euid).name
+end
+
+def do_pid(v,d)
+  d[:pid] = nil
+  if d[:status] == 'running' then
+    entry = (`ps -u #{d[:username]} -o pid= -o args=`.split(/\n/).grep(/VBoxHeadless/).grep(Regexp.new(d[:name])))[0]
+    if entry then
+      entry.strip!
+      d[:pid] = (entry.split(/\s+/))[0]
+    end
+  end
+end                                                                                      
+
+def do_ps_stats(v,d)
+  d[:used_memory_kb] = nil
+  d[:used_cpu_sec] = nil
+  if d[:status] == 'running' then
+    entry = `ps -p #{d[:pid]} -o vsz= -o time=`
+    m = entry.match(/(?<vsz>\d+)\s+(?<days>\d{0,2})-?(?<hours>\d{2}):(?<minutes>\d{2}):(?<seconds>\d{2})/)
+    if m then
+      d[:used_memory_kb] = m[:vsz]
+      d[:used_cpu_sec] = m[:seconds].to_i + m[:minutes].to_i*60 + m[:hours].to_i*3600 + (m[:days] || 0).to_i*3600*24
+    end
+  end
 end
 
 
