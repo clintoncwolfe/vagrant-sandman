@@ -35,7 +35,6 @@ def parse_opts
     :do_last_login => true,  # depends on status, vagrantfile dir
     :do_sandman_file => true, 
 
-    # presence of sandman file
     # info from Vagrantfile
     #   git up to date?
     #   uses includes?
