@@ -32,8 +32,9 @@ def parse_opts
     :do_guest_additions => true,
     :do_os_type => true,
     :do_disk_usage => true,
+    :do_last_login => true,  # depends on status, vagrantfile dir
+    :do_sandman_file => true, 
 
-    # last legit login
     # presence of sandman file
     # info from Vagrantfile
     #   git up to date?
@@ -61,19 +62,14 @@ def get_vm_details(opts, vbm, vm_name)
     vmi[match[:key]] = match[:val] if match
   end
 
-  pp vmi
+  # pp vmi
   
   return nil unless looks_like_vagrant(vmi)
 
   details = {}
   opts.select { |opt, val| opt =~ /^do_/ && val }.each do |task, flag|
     self.send(task, vmi, details)
-  end
-
-#   extract Vfile dir from shared folder list
-#   extract portmappings
-#   
-  
+  end  
   return details
 end
 
@@ -162,6 +158,41 @@ def do_disk_usage(v,d)
   end
 end
 
+def do_last_login(v,d)
+  d[:last_login] = Hash.new()
+  if d[:status] == 'running' then    
+    #mpatil   pts/19       client-10-8-3-78 Tue Jul  2 14:28 - 00:06  (09:37)    
+    re = /(\S+)\s+(?:\S+\/\d+)\s+(?:\S+)\s+(\S{3})\s+(\S{3})\s+(\d+)\s+(\d+):(\d{2})\s+-.+/
+    `cd #{d[:vagrantfile_dir]}; vagrant ssh -c last`.scan(re).each do |match|
+      (username, wday, mname, day, hour, min) = *match
+      current_year = DateTime.now.year      
+      [current_year, current_year - 1].each do |year|
+        login_epoch = DateTime.parse("#{wday} #{mname} #{day} #{hour}:#{min}:00 #{year}").strftime("%s").to_i
+        if login_epoch < DateTime.now.strftime('%s').to_i
+          # It's a plausibly legit date, store the max (most recent) login epoch
+          d[:last_login][username] ||= login_epoch
+          d[:last_login][username] = login_epoch > d[:last_login][username] ? login_epoch : d[:last_login][username]          
+          break
+        else
+          # Must be a login from last year
+          next
+        end
+      end      
+    end
+  end
+end
+
+def do_sandman_file(v,d) 
+  d[:sandman_file] = {}
+  path = File.join(d[:vagrantfile_dir], '.sandman')
+  if File.exists?(path) then
+    begin
+      d[:sandman_file] = JSON.parse(File.read(path))
+    rescue Exception => ex
+      # Just ignore?
+    end
+  end
+end
 
 def looks_like_vagrant(vmi)
   vmi.any? {|k,v| k =~ /^SharedFolderNameMachineMapping/ && v == 'v-root' }
