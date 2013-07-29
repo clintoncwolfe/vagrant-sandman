@@ -28,11 +28,11 @@ def parse_opts
     :do_memory => true,
     :do_pid => true,  # depends on status, name and user
     :do_ps_stats => true, # depends on status and pid
+    :do_portmap => true,
+    :do_guest_additions => true,
+    :do_os_type => true,
+    :do_disk_usage => true,
 
-    # sum of harddisks
-    # OS
-    # guest additions version
-    # port offset
     # last legit login
     # presence of sandman file
     # info from Vagrantfile
@@ -133,10 +133,41 @@ def do_cpus(v,d)
   d[:assigned_cpus] = v['cpus']
 end
 
+def do_portmap(v,d)
+  d[:portmap] = Hash.new
+  v.keys.grep(/Forwarding\(\d+\)/).each do |rulename|
+    parts = v[rulename].split(',')
+    d[:portmap][parts[5]] = parts[3]  # guest => host, 22 => 52022
+  end
+end
+
+def do_guest_additions(v,d)
+  d[:guest_additions_version] = nil
+  if v["GuestAdditionsVersion"] then
+    d[:guest_additions_version] = (v["GuestAdditionsVersion"].split(/\s+/))[0]
+  end
+end
+
+def do_os_type(v,d)
+  d[:os_type] = v["GuestOSType"] 
+end
+
+def do_disk_usage(v,d)
+  d[:disk_usage] = 0
+  v.keys.grep(/(SATA|IDE) Controller-\d+-\d+/).each do |attachment|
+    next if v[attachment] == 'none'
+    next if v[attachment] =~ /VBoxGuestAdditions\.iso/
+    next unless File.exists?(v[attachment])
+    d[:disk_usage] += File.size(v[attachment])
+  end
+end
+
 
 def looks_like_vagrant(vmi)
   vmi.any? {|k,v| k =~ /^SharedFolderNameMachineMapping/ && v == 'v-root' }
 end
+
+
 
 
 def output_results (opts, results)
